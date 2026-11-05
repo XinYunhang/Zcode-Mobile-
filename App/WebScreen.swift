@@ -30,13 +30,17 @@ struct WebScreen: View {
                     Divider()
                     Button("更换连接地址", role: .destructive) { session.forget() }
                 } label: {
-                    Image(systemName: "ellipsis.circle.fill")
-                        .font(.title3)
-                        .padding(10)
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 28, height: 28)
                         .background(.regularMaterial, in: Circle())
-                        .opacity(0.55)
+                        .opacity(0.5)
                 }
-                .padding(12)
+                // Raised clear of the page's compose row, which owns the
+                // bottom-right corner.
+                .padding(.trailing, 12)
+                .padding(.bottom, 100)
             }
 
             if model.unreachable {

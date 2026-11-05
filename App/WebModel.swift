@@ -22,6 +22,17 @@ final class WebModel: NSObject, ObservableObject {
         configuration.allowsInlineMediaPlayback = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
 
+        // An app that declares no localizations reports en-US to the web view,
+        // so the page falls back to English even on a Chinese device. Correct
+        // navigator.language before any page script runs.
+        configuration.userContentController.addUserScript(
+            WKUserScript(
+                source: Self.languageOverrideScript,
+                injectionTime: .atDocumentStart,
+                forMainFrameOnly: true
+            )
+        )
+
         webView = WKWebView(frame: .zero, configuration: configuration)
         super.init()
 
@@ -123,6 +134,33 @@ final class WebModel: NSObject, ObservableObject {
       return JSON.stringify(out);
     })();
     """
+
+    private static var languageOverrideScript: String {
+        let preferred = Locale.preferredLanguages
+        let primary = preferred.first ?? "en-US"
+        let languages = preferred.isEmpty ? [primary] : Array(preferred.prefix(3))
+        return """
+        (function () {
+          try {
+            Object.defineProperty(navigator, 'language', { get: function () { return \(jsonString(primary)); } });
+            Object.defineProperty(navigator, 'languages', { get: function () { return \(jsonArray(languages)); } });
+          } catch (e) {}
+        })();
+        """
+    }
+
+    private static func jsonString(_ value: String) -> String {
+        guard let data = try? JSONSerialization.data(withJSONObject: [value]),
+              let text = String(data: data, encoding: .utf8) else { return "\"en-US\"" }
+        // JSONSerialization returns ["zh-CN"]; drop the brackets.
+        return String(text.dropFirst().dropLast())
+    }
+
+    private static func jsonArray(_ values: [String]) -> String {
+        guard let data = try? JSONSerialization.data(withJSONObject: values),
+              let text = String(data: data, encoding: .utf8) else { return "[]" }
+        return text
+    }
 }
 
 // MARK: - WKNavigationDelegate
