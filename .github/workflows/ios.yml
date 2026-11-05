@@ -1,0 +1,54 @@
+name: Build IPA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      # Unsigned on purpose: signing happens on your own machine with your
+      # certificate, so no Apple credentials live in this repository.
+      - name: Build
+        run: |
+          xcodebuild \
+            -project ZCodeShell.xcodeproj \
+            -scheme ZCodeShell \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p out/Payload
+          cp -R build/Build/Products/Release-iphoneos/ZCodeShell.app out/Payload/
+          # Ad-hoc sign so the bundle has a valid signature structure; on-device
+          # signing tools re-sign over it. It still cannot install on its own.
+          codesign --force --deep --sign - out/Payload/ZCodeShell.app
+          cd out && zip -qry ZCodeShell-unsigned.ipa Payload
+          ls -lh ZCodeShell-unsigned.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZCodeShell-unsigned
+          path: out/ZCodeShell-unsigned.ipa

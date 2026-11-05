@@ -1,0 +1,36 @@
+name: ZCodeShell
+
+options:
+  bundleIdPrefix: com.zcode
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+targets:
+  ZCodeShell:
+    type: application
+    platform: iOS
+    sources:
+      - App
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.zcode.shell
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_VERSION: "5.0"
+        IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    scheme:
+      testTargets: []
+    info:
+      path: Resources/Info.plist
+      properties:
+        CFBundleDisplayName: ZCode
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        NSCameraUsageDescription: 用于在对话中拍照并上传。
+        NSPhotoLibraryUsageDescription: 用于在对话中选取并上传图片。
+        NSMicrophoneUsageDescription: 用于语音输入。
