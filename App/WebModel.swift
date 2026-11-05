@@ -10,6 +10,7 @@ final class WebModel: NSObject, ObservableObject {
     private let url: URL
     private var savedScroll = "[]"
     private var reachabilityTask: Task<Void, Never>?
+    private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
 
     init(url: URL) {
         self.url = url
@@ -48,6 +49,18 @@ final class WebModel: NSObject, ObservableObject {
             name: UIApplication.willResignActiveNotification,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(beginKeepAlive),
+            name: UIApplication.didEnterBackgroundNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(endKeepAlive),
+            name: UIApplication.willEnterForegroundNotification,
+            object: nil
+        )
 
         reload()
     }
@@ -55,6 +68,26 @@ final class WebModel: NSObject, ObservableObject {
     deinit {
         reachabilityTask?.cancel()
         NotificationCenter.default.removeObserver(self)
+        endKeepAlive()
+    }
+
+    // MARK: - Background keep-alive
+
+    /// iOS suspends the app seconds after it leaves the foreground, and a
+    /// suspended process cannot hold a socket open. A background task buys
+    /// roughly thirty seconds of real execution, which is enough to survive a
+    /// quick switch to another app.
+    @objc private func beginKeepAlive() {
+        guard backgroundTask == .invalid else { return }
+        backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "keepAlive") { [weak self] in
+            self?.endKeepAlive()
+        }
+    }
+
+    @objc private func endKeepAlive() {
+        guard backgroundTask != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(backgroundTask)
+        backgroundTask = .invalid
     }
 
     // MARK: - Loading
@@ -82,13 +115,24 @@ final class WebModel: NSObject, ObservableObject {
         reachabilityTask?.cancel()
         reachabilityTask = Task { [weak self] in
             guard let self else { return }
-            let result = await ConnectionProbe.run(self.url, timeout: 5)
+
+            // The network stack is often not ready the instant the app wakes up,
+            // so a single failure right after resume means nothing.
+            for attempt in 0..<2 {
+                if attempt > 0 {
+                    try? await Task.sleep(nanoseconds: 1_200_000_000)
+                }
+                if Task.isCancelled { return }
+                if case .ok = await ConnectionProbe.run(self.url, timeout: 4) {
+                    await MainActor.run { self.unreachable = false }
+                    return
+                }
+            }
+
             await MainActor.run {
-                switch result {
-                case .ok:
-                    self.unreachable = false
-                case .failed:
-                    self.unreachable = !self.webView.isLoading
+                // A page that is still loading will report its own failure.
+                if !self.webView.isLoading {
+                    self.unreachable = true
                 }
             }
         }
