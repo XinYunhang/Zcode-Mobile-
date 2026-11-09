@@ -53,31 +53,31 @@ struct WebScreen: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-
+        }
+        // safeAreaInset keeps the bar above the keyboard, including the
+        // input-assistant row that a plain overlay ignores.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             if model.isChat && !model.unreachable {
-                VStack(spacing: 0) {
-                    Spacer(minLength: 0)
-                    ComposerBar(
-                        draft: $draft,
-                        onPlus: { showingTools = true },
-                        onSend: {
-                            model.send(draft)
-                            draft = ""
-                        }
-                    )
-                    .padding(.horizontal, 12)
-                    .sheet(isPresented: $showingTools) {
-                        ToolSheet(
-                            modelName: model.modelName,
-                            modeName: model.modeName,
-                            onAttach: { closeTools(then: model.pickAttachment) },
-                            onPlugins: { closeTools(then: model.openAttachmentPanel) },
-                            onPermission: { closeTools(then: model.openModePopover) },
-                            onModel: { closeTools(then: model.openModelPopover) }
-                        )
+                ComposerBar(
+                    draft: $draft,
+                    onPlus: { showingTools = true },
+                    onSend: {
+                        model.send(draft)
+                        draft = ""
                     }
+                )
+                .padding(.horizontal, 12)
+                .padding(.bottom, 6)
+                .sheet(isPresented: $showingTools) {
+                    ToolSheet(
+                        modelName: model.modelName,
+                        modeName: model.modeName,
+                        onAttach: { closeTools(then: model.pickAttachment) },
+                        onPlugins: { closeTools(then: model.openAttachmentPanel) },
+                        onPermission: { closeTools(then: model.openModePopover) },
+                        onModel: { closeTools(then: model.openModelPopover) }
+                    )
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .animation(.easeInOut(duration: 0.18), value: model.isChat)
