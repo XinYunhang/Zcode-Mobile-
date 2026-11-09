@@ -783,7 +783,9 @@ extension WebModel: WKNavigationDelegate {
 
 extension WebModel: WKUIDelegate {
     /// Handles `<input type="file">` taps. Without this the page's attachment
-    /// button silently does nothing.
+    /// button silently does nothing. The parameters type is annotated iOS 18.4+
+    /// in current SDKs, so the method only installs on those systems.
+    @available(iOS 18.4, *)
     func webView(
         _ webView: WKWebView,
         runOpenPanelWith parameters: WKOpenPanelParameters,
