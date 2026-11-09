@@ -5,9 +5,7 @@ struct WebScreen: View {
     @Environment(\.scenePhase) private var scenePhase
 
     @StateObject private var model: WebModel
-
     @State private var showingPairing = false
-    @State private var showingMore = false
 
     init(url: URL) {
         _model = StateObject(wrappedValue: WebModel(url: url))
@@ -25,7 +23,10 @@ struct WebScreen: View {
                     online: !model.unreachable,
                     onMenu: { model.exitToTaskList() },
                     onScan: { showingPairing = true },
-                    onMore: { showingMore = true }
+                    onExit: { model.exitToTaskList() },
+                    onReload: { model.reload() },
+                    onClearCache: { model.clearCacheAndReload() },
+                    onChangeLink: { session.forget() }
                 )
                 .padding(.horizontal, 16)
                 .padding(.top, 4)
@@ -53,13 +54,6 @@ struct WebScreen: View {
         .sheet(isPresented: $showingPairing) {
             PairingView()
                 .environmentObject(session)
-        }
-        .confirmationDialog("会话", isPresented: $showingMore, titleVisibility: .hidden) {
-            Button("退出任务会话") { model.exitToTaskList() }
-            Button("重新加载") { model.reload() }
-            Button("清除缓存并重载") { model.clearCacheAndReload() }
-            Button("更换连接地址") { session.forget() }
-            Button("取消", role: .cancel) {}
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {

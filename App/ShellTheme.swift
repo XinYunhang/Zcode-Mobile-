@@ -9,22 +9,27 @@ import WebKit
 /// scoped to `html.zcs` so a failed injection leaves the page untouched.
 enum ShellTheme {
     static let css = """
-    /* 1. Blank the page's own header. It keeps its height, so nothing reflows;
-          the native bar is drawn over the same strip. */
-    html.zcs [data-testid="workspace-header"] {
+    /* 1. The conversation's own title bar. It has no testid, so identify it as
+          the row that directly holds the back button. Keep its height (slightly
+          taller, to match the native bar) so nothing reflows. */
+    html.zcs div:has(> button[aria-label="返回任务首页"]) {
+      height: 52px !important;
       opacity: 0 !important;
       pointer-events: none !important;
       border-bottom-color: transparent !important;
     }
 
-    /* 2. Composer: glassier card instead of a flat block. */
-    html.zcs [data-testid="v4-composer"] .chat-composer-input-surface {
+    /* 2. The project / workspace chip row underneath it. */
+    html.zcs [data-testid="workspace-header"] {
+      display: none !important;
+    }
+
+    /* 3. Composer card: glassier surface instead of a flat block. */
+    html.zcs [data-testid="v4-composer"] .rounded-2xl {
       border-radius: 26px !important;
       background: rgba(255,255,255,.055) !important;
-      border: .5px solid rgba(255,255,255,.10) !important;
+      border-color: rgba(255,255,255,.10) !important;
       box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 10px 26px rgba(0,0,0,.34) !important;
-      -webkit-backdrop-filter: blur(22px) saturate(160%);
-      backdrop-filter: blur(22px) saturate(160%);
     }
     """
 

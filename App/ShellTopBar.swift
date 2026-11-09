@@ -7,7 +7,10 @@ struct ShellTopBar: View {
     let online: Bool
     let onMenu: () -> Void
     let onScan: () -> Void
-    let onMore: () -> Void
+    let onExit: () -> Void
+    let onReload: () -> Void
+    let onClearCache: () -> Void
+    let onChangeLink: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
@@ -21,6 +24,7 @@ struct ShellTopBar: View {
         Button(action: onMenu) {
             Image(systemName: "line.3.horizontal")
                 .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(.primary)
                 .frame(width: 46, height: 46)
                 .contentShape(Circle())
         }
@@ -43,19 +47,26 @@ struct ShellTopBar: View {
             Button(action: onScan) {
                 Image(systemName: "viewfinder")
                     .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(.primary)
                     .frame(width: 46, height: 46)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("重新配对")
 
-            Button(action: onMore) {
+            Menu {
+                Button("退出任务会话", systemImage: "chevron.backward", action: onExit)
+                Divider()
+                Button("重新加载", systemImage: "arrow.clockwise", action: onReload)
+                Button("清除缓存并重载", systemImage: "trash", action: onClearCache)
+                Button("更换连接地址", systemImage: "link", action: onChangeLink)
+            } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.primary)
                     .frame(width: 46, height: 46)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
             .accessibilityLabel("更多")
         }
         .background(.ultraThinMaterial, in: Capsule())

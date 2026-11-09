@@ -143,11 +143,13 @@ final class WebModel: NSObject, ObservableObject {
         )
     }
 
-    /// Leaves the conversation and returns to the task list.
+    /// Leaves the conversation and returns to the task list. The page's back
+    /// control has no testid; it is the only button in the title row, and its
+    /// accessibility label is the one stable handle on it.
     func exitToTaskList() {
         webView.evaluateJavaScript("""
         (function(){
-          var el = document.querySelector('[data-testid=side-pane-toggle]');
+          var el = document.querySelector('button[aria-label="返回任务首页"]');
           if (el) { el.click(); return; }
           history.back();
         })();
