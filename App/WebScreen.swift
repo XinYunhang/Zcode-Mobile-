@@ -21,7 +21,9 @@ struct WebScreen: View {
             if model.isChat {
                 ShellTopBar(
                     online: !model.unreachable,
-                    onMenu: { model.exitToTaskList() },
+                    // The left button is intentionally inert for now; the task
+                    // list entry is still being designed.
+                    onMenu: {},
                     onScan: { showingPairing = true },
                     onExit: { model.exitToTaskList() },
                     onReload: { model.reload() },

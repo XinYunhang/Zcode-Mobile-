@@ -10,13 +10,10 @@ import WebKit
 enum ShellTheme {
     static let css = """
     /* 1. The conversation's own title bar. It has no testid, so identify it as
-          the row that directly holds the back button. Keep its height (slightly
-          taller, to match the native bar) so nothing reflows. */
+          the row that directly holds the back button. Removed outright: the
+          native bar floats over the content instead of reserving a strip. */
     html.zcs div:has(> button[aria-label="返回任务首页"]) {
-      height: 52px !important;
-      opacity: 0 !important;
-      pointer-events: none !important;
-      border-bottom-color: transparent !important;
+      display: none !important;
     }
 
     /* 2. The project / workspace chip row underneath it. */
@@ -24,7 +21,13 @@ enum ShellTheme {
       display: none !important;
     }
 
-    /* 3. Composer card: glassier surface instead of a flat block. */
+    /* 3. Give the transcript room to scroll clear of the floating bar, so the
+          first message is never permanently hidden behind it. */
+    html.zcs [data-testid="v4-timeline"] {
+      padding-top: 56px !important;
+    }
+
+    /* 4. Composer card: glassier surface instead of a flat block. */
     html.zcs [data-testid="v4-composer"] .rounded-2xl {
       border-radius: 26px !important;
       background: rgba(255,255,255,.055) !important;
@@ -33,26 +36,22 @@ enum ShellTheme {
     }
     """
 
-    /// Applies the stylesheet once the app has actually rendered, and marks the
-    /// root so the rules only ever take effect against a page we recognise.
-    /// The SPA mounts after document end, so this retries for a few seconds.
+    /// Installs the stylesheet as soon as the document has a head. The rules are
+    /// all scoped to `html.zcs` and to elements that may appear later, so there
+    /// is no need to wait for a particular screen — which matters because the
+    /// app starts on the task list and only later opens a conversation.
     static var injectionScript: WKUserScript {
         let js = """
         (function () {
-          var tries = 0;
           function apply() {
             try {
-              if (!document.querySelector('[data-testid="v4-composer"], [data-testid="workspace-header"]')) {
-                if (++tries < 40) { setTimeout(apply, 250); }
-                return;
-              }
+              if (!document.head) { setTimeout(apply, 50); return; }
               document.documentElement.classList.add('zcs');
-              if (!document.getElementById('zcs-style')) {
-                var style = document.createElement('style');
-                style.id = 'zcs-style';
-                style.textContent = \(jsLiteral(css));
-                document.head.appendChild(style);
-              }
+              if (document.getElementById('zcs-style')) return;
+              var style = document.createElement('style');
+              style.id = 'zcs-style';
+              style.textContent = \(jsLiteral(css));
+              document.head.appendChild(style);
             } catch (e) {}
           }
           apply();

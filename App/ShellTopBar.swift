@@ -18,13 +18,16 @@ struct ShellTopBar: View {
             Spacer(minLength: 0)
             trailingPill
         }
+        // The page is dark regardless of the system appearance, so the chrome
+        // must render dark too: otherwise material goes light and icons go black.
+        .environment(\.colorScheme, .dark)
     }
 
     private var menuButton: some View {
         Button(action: onMenu) {
             Image(systemName: "line.3.horizontal")
                 .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(.primary)
+                .foregroundStyle(.white)
                 .frame(width: 46, height: 46)
                 .contentShape(Circle())
         }
@@ -47,7 +50,7 @@ struct ShellTopBar: View {
             Button(action: onScan) {
                 Image(systemName: "viewfinder")
                     .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(.white)
                     .frame(width: 46, height: 46)
                     .contentShape(Rectangle())
             }
@@ -63,7 +66,7 @@ struct ShellTopBar: View {
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(.white)
                     .frame(width: 46, height: 46)
                     .contentShape(Rectangle())
             }
