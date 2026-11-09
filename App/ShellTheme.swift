@@ -53,6 +53,21 @@ enum ShellTheme {
     html.zcs .group\\/user-row > div.rounded-xl * {
       color: #fff !important;
     }
+
+    /* 7. The model picker now lives in the attachment panel. Keep the trigger in
+          the DOM with a zero-width box: the popover anchors to its rect, so it
+          must not be display:none, but it should leave no gap in the row. */
+    html.zcs [data-testid="chat-model-select-trigger"] {
+      width: 0 !important;
+      min-width: 0 !important;
+      max-width: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border: 0 !important;
+      overflow: hidden !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
     """
 
     /// Installs the stylesheet as soon as the document has a head. The rules are
