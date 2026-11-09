@@ -20,7 +20,7 @@ struct ComposerBar: View {
     private let corner: CGFloat = 26
     private let button: CGFloat = 30
     /// Height of the text field on a single line, padding included.
-    private let singleLineHeight: CGFloat = 34
+    private let singleLineHeight: CGFloat = 32
 
     private var isMultiline: Bool { fieldHeight > singleLineHeight }
 
@@ -63,14 +63,17 @@ struct ComposerBar: View {
                 .submitLabel(.send)
                 .onSubmit(submit)
                 .padding(.vertical, 5)
-                .padding(.leading, isMultiline ? 2 : button + 10)
-                .padding(.trailing, isMultiline ? 2 : button + 10)
-                .padding(.bottom, isMultiline ? button + 6 : 0)
+                // Measured before the layout padding below, otherwise the
+                // multiline bottom inset keeps the height above the threshold
+                // and the bar can never return to one line.
                 .background(
                     GeometryReader { proxy in
                         Color.clear.preference(key: FieldHeightKey.self, value: proxy.size.height)
                     }
                 )
+                .padding(.leading, isMultiline ? 2 : button + 10)
+                .padding(.trailing, isMultiline ? 2 : button + 10)
+                .padding(.bottom, isMultiline ? button + 6 : 0)
 
             HStack(spacing: 0) {
                 Button {

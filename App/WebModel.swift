@@ -67,6 +67,9 @@ final class WebModel: NSObject, ObservableObject {
 
         webView.navigationDelegate = self
         webView.uiDelegate = self
+        // The shell and the page are designed dark-only; on a light system
+        // setting the page would otherwise render light under white chrome.
+        webView.overrideUserInterfaceStyle = .dark
         webView.allowsBackForwardNavigationGestures = false
         webView.allowsLinkPreview = false
 
