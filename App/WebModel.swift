@@ -4,6 +4,9 @@ import WebKit
 final class WebModel: NSObject, ObservableObject {
     @Published var unreachable = false
     @Published var loading = true
+    /// True while a conversation is open, so the native bar only covers the
+    /// strips it was designed for.
+    @Published var isChat = true
 
     let webView: WKWebView
 
@@ -11,6 +14,7 @@ final class WebModel: NSObject, ObservableObject {
     private var savedScroll = "[]"
     private var reachabilityTask: Task<Void, Never>?
     private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
+    private var routeTimer: Timer?
 
     init(url: URL) {
         self.url = url
@@ -33,6 +37,7 @@ final class WebModel: NSObject, ObservableObject {
                 forMainFrameOnly: true
             )
         )
+        configuration.userContentController.addUserScript(ShellTheme.injectionScript)
 
         webView = WKWebView(frame: .zero, configuration: configuration)
         super.init()
@@ -63,12 +68,30 @@ final class WebModel: NSObject, ObservableObject {
         )
 
         reload()
+
+        // The page routes on its own (picking a task, going back), so poll the
+        // one cheap signal that tells us which surface is on screen.
+        let timer = Timer.scheduledTimer(withTimeInterval: 1.2, repeats: true) { [weak self] _ in
+            self?.pollRoute()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        routeTimer = timer
     }
 
     deinit {
+        routeTimer?.invalidate()
         reachabilityTask?.cancel()
         NotificationCenter.default.removeObserver(self)
         endKeepAlive()
+    }
+
+    private func pollRoute() {
+        webView.evaluateJavaScript("!!document.querySelector('[data-testid=\"v4-composer\"]')") { [weak self] value, _ in
+            guard let self else { return }
+            let flag = (value as? NSNumber)?.boolValue ?? (value as? Bool) ?? false
+            guard self.isChat != flag else { return }
+            DispatchQueue.main.async { self.isChat = flag }
+        }
     }
 
     // MARK: - Background keep-alive
@@ -107,6 +130,34 @@ final class WebModel: NSObject, ObservableObject {
         WKWebsiteDataStore.default().removeData(ofTypes: types, modifiedSince: .distantPast) { [weak self] in
             self?.reload(fromOrigin: true)
         }
+    }
+
+    // MARK: - Driving the page
+
+    /// Clicks a control the page marks with `data-testid`. Returns false when the
+    /// hook is gone, which is the signal that the page evolved past this build.
+    @discardableResult
+    func tap(testID: String) async -> Bool {
+        let js = """
+        const el = document.querySelector('[data-testid="' + testID + '"]');
+        if (!el) return false;
+        el.click();
+        return true;
+        """
+        let result = try? await webView.callAsyncJavaScript(
+            js,
+            arguments: ["testID": testID],
+            in: nil,
+            in: .page
+        )
+        if let number = result as? NSNumber { return number.boolValue }
+        return (result as? Bool) ?? false
+    }
+
+    /// Leaves the conversation and returns to the task list.
+    func exitToTaskList() async {
+        if await tap(testID: "side-pane-toggle") { return }
+        webView.evaluateJavaScript("history.back()")
     }
 
     /// Called when the app returns to the foreground. A hung page cannot tell us
