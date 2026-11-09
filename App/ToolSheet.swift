@@ -11,31 +11,26 @@ struct ToolSheet: View {
     let onPermission: () -> Void
     let onModel: () -> Void
 
+    /// Four rows at 46pt plus the drag indicator and a home-indicator inset.
+    private let detentHeight: CGFloat = 248
+
     var body: some View {
         VStack(spacing: 0) {
             row(symbol: "paperclip", title: "附件", value: nil, action: onAttach)
-            divider
             row(symbol: "square.grid.2x2", title: "插件", value: nil, action: onPlugins)
-            divider
             row(symbol: "shield.lefthalf.filled", title: "访问权限", value: modeName, action: onPermission)
-            divider
             row(symbol: "cpu", title: "模型", value: modelName, action: onModel)
             Spacer(minLength: 0)
         }
-        .padding(.top, 16)
-        .padding(.horizontal, 18)
+        .padding(.horizontal, 16)
+        .padding(.top, 22)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(Color(red: 0.07, green: 0.07, blue: 0.08))
-        .presentationDetents([.height(340)])
+        .presentationDetents([.height(detentHeight)])
         .presentationDragIndicator(.visible)
+        // Approximates the system material; a full sheet is too large an area
+        // for actual glass to read well.
+        .presentationBackground(.ultraThinMaterial)
         .environment(\.colorScheme, .dark)
-    }
-
-    private var divider: some View {
-        Rectangle()
-            .fill(Color.white.opacity(0.07))
-            .frame(height: 0.5)
-            .padding(.leading, 40)
     }
 
     private func row(
@@ -49,7 +44,7 @@ struct ToolSheet: View {
                 Image(systemName: symbol)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(.white.opacity(0.85))
-                    .frame(width: 28, height: 28)
+                    .frame(width: 26, height: 26)
 
                 Text(title)
                     .font(.system(size: 16))
@@ -65,10 +60,10 @@ struct ToolSheet: View {
                 }
 
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.28))
             }
-            .padding(.vertical, 15)
+            .padding(.vertical, 12)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

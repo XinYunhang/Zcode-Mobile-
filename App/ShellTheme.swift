@@ -87,6 +87,14 @@ enum ShellTheme {
         transparent 100%
       );
     }
+
+    /* 9. The attachment panel is a web popover anchored to the composer, but the
+          native bar is drawn above the web view, so it would cover the panel's
+          bottom. Lift the anchor: the panel positions itself from the button's
+          rect, and the button itself is invisible anyway. */
+    html.zcs [data-testid="chat-attachment-button"] {
+      transform: translateY(-76px) !important;
+    }
     """
 
     /// Installs the stylesheet as soon as the document has a head. The rules are
