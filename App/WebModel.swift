@@ -51,6 +51,7 @@ final class WebModel: NSObject, ObservableObject {
         super.init()
 
         webView.navigationDelegate = self
+        webView.uiDelegate = self
         webView.allowsBackForwardNavigationGestures = false
         webView.allowsLinkPreview = false
 
@@ -775,6 +776,33 @@ extension WebModel: WKNavigationDelegate {
     /// Safari answers with a "reload" prompt. Reload quietly instead.
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         reload()
+    }
+}
+
+// MARK: - WKUIDelegate
+
+extension WebModel: WKUIDelegate {
+    /// Handles `<input type="file">` taps. Without this the page's attachment
+    /// button silently does nothing.
+    func webView(
+        _ webView: WKWebView,
+        runOpenPanelWith parameters: WKOpenPanelParameters,
+        initiatedByFrame frame: WKFrameInfo,
+        completionHandler: @escaping ([URL]?) -> Void
+    ) {
+        guard let root = webView.window?.rootViewController else {
+            completionHandler(nil)
+            return
+        }
+        var presenter = root
+        while let presented = presenter.presentedViewController {
+            presenter = presented
+        }
+        FilePicker.present(
+            from: presenter,
+            allowsMultiple: parameters.allowsMultipleSelection,
+            completion: completionHandler
+        )
     }
 }
 
