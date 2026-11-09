@@ -54,18 +54,18 @@ enum ShellTheme {
       color: #fff !important;
     }
 
-    /* 7. The model picker now lives in the attachment panel. The trigger has to
-          keep a real, non-zero box because the popover anchors to its rect; a
-          zero-width box produced no usable anchor and the panel never showed.
-          Absolute positioning takes it out of the row without leaving a gap. */
-    html.zcs [data-testid="chat-model-select-trigger"] {
-      position: absolute !important;
-      right: 70px !important;
-      bottom: 12px !important;
-      width: 60px !important;
-      height: 28px !important;
+    /* 7. The composer is drawn natively now. Fade the page's card out but keep
+          its box in the layout: the attachment panel and the model popover
+          anchor to controls inside it, so it must not be display:none. */
+    html.zcs [data-testid="v4-composer"] .rounded-2xl {
+      height: 64px !important;
+      min-height: 64px !important;
+      overflow: hidden !important;
       opacity: 0 !important;
       pointer-events: none !important;
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
     }
     """
 

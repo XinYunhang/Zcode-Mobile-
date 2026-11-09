@@ -76,7 +76,7 @@ struct ShellTopBar: View {
     }
 }
 
-private extension View {
+extension View {
     /// iOS 26 renders the system Liquid Glass material; older systems fall back
     /// to a blur. The glass branch also carries its own edge treatment, so no
     /// manual border is added on top.

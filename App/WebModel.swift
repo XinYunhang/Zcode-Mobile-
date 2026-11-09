@@ -170,6 +170,75 @@ final class WebModel: NSObject, ObservableObject {
         return String(text.dropFirst().dropLast())
     }
 
+    // MARK: - Native composer bridge
+
+    /// Opens the attachment panel by pressing the page's own control. The
+    /// control is invisible now, but its box is kept so the popover still
+    /// anchors above the composer.
+    func openAttachmentPanel() {
+        webView.evaluateJavaScript("""
+        (function(){
+          var el = document.querySelector('[data-testid="chat-attachment-button"]');
+          if (!el) { return; }
+          var r = el.getBoundingClientRect();
+          var x = r.left + r.width / 2;
+          var y = r.top + r.height / 2;
+          function init(b, d) {
+            return { bubbles: true, cancelable: true, composed: true, view: window,
+                     detail: d, clientX: x, clientY: y, screenX: x, screenY: y,
+                     pointerId: 1, pointerType: 'touch', isPrimary: true,
+                     button: 0, buttons: b };
+          }
+          var Ctor = window.PointerEvent || window.MouseEvent;
+          el.dispatchEvent(new Ctor('pointerdown', init(1, 0)));
+          el.dispatchEvent(new Ctor('pointerup', init(0, 0)));
+          el.dispatchEvent(new Ctor('click', init(0, 1)));
+        })();
+        """)
+    }
+
+    /// Writes the draft into the page's rich-text editor and presses send.
+    /// `execCommand('insertText')` is what the editor actually listens for;
+    /// assigning textContent or dispatching input events does not update it.
+    func send(_ draft: String) {
+        let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let payload = Self.jsString(trimmed)
+
+        webView.evaluateJavaScript("""
+        (function(){
+          var input = document.querySelector('[data-testid="v4-composer-input"]');
+          if (!input) { return; }
+          input.focus();
+          var sel = window.getSelection();
+          var range = document.createRange();
+          range.selectNodeContents(input);
+          sel.removeAllRanges();
+          sel.addRange(range);
+          document.execCommand('delete', false);
+          document.execCommand('insertText', false, \(payload));
+
+          window.setTimeout(function(){
+            var btn = document.querySelector('[data-testid="v4-composer-send"]');
+            if (!btn) { return; }
+            var r = btn.getBoundingClientRect();
+            var x = r.left + r.width / 2;
+            var y = r.top + r.height / 2;
+            function init(b, d) {
+              return { bubbles: true, cancelable: true, composed: true, view: window,
+                       detail: d, clientX: x, clientY: y, screenX: x, screenY: y,
+                       pointerId: 1, pointerType: 'touch', isPrimary: true,
+                       button: 0, buttons: b };
+            }
+            var Ctor = window.PointerEvent || window.MouseEvent;
+            btn.dispatchEvent(new Ctor('pointerdown', init(1, 0)));
+            btn.dispatchEvent(new Ctor('pointerup', init(0, 0)));
+            btn.dispatchEvent(new Ctor('click', init(0, 1)));
+          }, 180);
+        })();
+        """)
+    }
+
     /// Called when the app returns to the foreground. A hung page cannot tell us
     /// anything, so ask the network directly and cover it with a native prompt.
     func checkReachability() {
@@ -493,19 +562,21 @@ final class WebModel: NSObject, ObservableObject {
         var label = rowLabel(name);
         var row = panel.querySelector('[' + ROW_ATTR + ']');
 
-        // Insert as a direct child of the panel, not beside the first row.
-        // Sibling insertion landed inside one of the panel's internal groups
-        // and squashed the rows below it onto a single line.
+        // Insert into the panel's scrollable list, not the panel root and not
+        // beside the first row. The root sits outside the scroll area, and the
+        // first row lives inside a group whose layout must not be disturbed.
+        var list = panel.firstElementChild || panel;
+
         if (!row) {
           row = buildRow(name);
           styleRow(row, null);
-          panel.insertBefore(row, panel.firstChild);
+          list.insertBefore(row, list.firstChild);
           return;
         }
 
-        if (row.parentNode !== panel || panel.firstElementChild !== row) {
+        if (row.parentNode !== list || list.firstElementChild !== row) {
           styleRow(row, null);
-          panel.insertBefore(row, panel.firstChild);
+          list.insertBefore(row, list.firstChild);
         }
 
         if (row.getAttribute(ROW_LABEL_ATTR) !== label) {
