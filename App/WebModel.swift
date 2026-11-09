@@ -246,7 +246,9 @@ final class WebModel: NSObject, ObservableObject {
           var list = document.querySelectorAll('[data-testid^="v4-attachment-"]');
           var item = list[index];
           if (!item) { return; }
-          var button = item.querySelector('button[aria-label*="移除"]');
+          var button = item.querySelector(
+            'button[aria-label*="移除"], button[aria-label*="Remove"], button[aria-label*="remove"]'
+          );
           if (button) { button.click(); }
         })(\(index));
         """)
