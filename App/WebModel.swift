@@ -8,6 +8,9 @@ final class WebModel: NSObject, ObservableObject {
     /// strips it was designed for. Starts false: the app opens on the task list,
     /// and showing the bar before the first check made it flash on launch.
     @Published var isChat = false
+    /// Mirrors of the page's current selections, shown in the native tool sheet.
+    @Published var modelName = ""
+    @Published var modeName = ""
 
     let webView: WKWebView
 
@@ -95,11 +98,31 @@ final class WebModel: NSObject, ObservableObject {
     }
 
     private func pollRoute() {
-        webView.evaluateJavaScript("!!document.querySelector('[data-testid=\"v4-composer\"]')") { [weak self] value, _ in
-            guard let self else { return }
-            let flag = (value as? NSNumber)?.boolValue ?? (value as? Bool) ?? false
-            guard self.isChat != flag else { return }
-            DispatchQueue.main.async { self.isChat = flag }
+        let js = """
+        (function(){
+          var composer = document.querySelector('[data-testid="v4-composer"]');
+          if (!composer) { return { chat: false, model: '', mode: '' }; }
+          function text(selector) {
+            var el = document.querySelector(selector);
+            return el ? (el.innerText || '').replace(/\\s+/g, ' ').trim() : '';
+          }
+          return {
+            chat: true,
+            model: text('[data-testid="chat-model-select-trigger"]'),
+            mode: text('[data-testid="chat-mode-select-trigger"]')
+          };
+        })();
+        """
+        webView.evaluateJavaScript(js) { [weak self] value, _ in
+            guard let self, let dict = value as? [String: Any] else { return }
+            let chat = (dict["chat"] as? NSNumber)?.boolValue ?? (dict["chat"] as? Bool) ?? false
+            let model = dict["model"] as? String ?? ""
+            let mode = dict["mode"] as? String ?? ""
+            DispatchQueue.main.async {
+                if self.isChat != chat { self.isChat = chat }
+                if self.modelName != model { self.modelName = model }
+                if self.modeName != mode { self.modeName = mode }
+            }
         }
     }
 
@@ -174,13 +197,13 @@ final class WebModel: NSObject, ObservableObject {
 
     // MARK: - Native composer bridge
 
-    /// Opens the attachment panel by pressing the page's own control. The
-    /// control is invisible now, but its box is kept so the popover still
-    /// anchors above the composer.
-    func openAttachmentPanel() {
+    /// Presses a control the way a finger would. Radix triggers open on
+    /// pointerdown, so a bare `click()` is ignored.
+    private func pointerTap(selector: String) {
+        let literal = Self.jsString(selector)
         webView.evaluateJavaScript("""
-        (function(){
-          var el = document.querySelector('[data-testid="chat-attachment-button"]');
+        (function(sel){
+          var el = document.querySelector(sel);
           if (!el) { return; }
           var r = el.getBoundingClientRect();
           var x = r.left + r.width / 2;
@@ -195,8 +218,31 @@ final class WebModel: NSObject, ObservableObject {
           el.dispatchEvent(new Ctor('pointerdown', init(1, 0)));
           el.dispatchEvent(new Ctor('pointerup', init(0, 0)));
           el.dispatchEvent(new Ctor('click', init(0, 1)));
-        })();
+        })(\(literal));
         """)
+    }
+
+    /// Opens the page's attachment panel — used for the plugin list, which stays
+    /// a web surface in this build.
+    func openAttachmentPanel() {
+        pointerTap(selector: "[data-testid=chat-attachment-button]")
+    }
+
+    /// Opens the page's attachment panel and immediately presses its first item,
+    /// which is what raises the system file picker.
+    func pickAttachment() {
+        pointerTap(selector: "[data-testid=chat-attachment-button]")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
+            self?.pointerTap(selector: "[data-testid=chat-attachment-menu-item]")
+        }
+    }
+
+    func openModelPopover() {
+        pointerTap(selector: "[data-testid=chat-model-select-trigger]")
+    }
+
+    func openModePopover() {
+        pointerTap(selector: "[data-testid=chat-mode-select-trigger]")
     }
 
     /// Writes the draft into the page's rich-text editor and presses send.

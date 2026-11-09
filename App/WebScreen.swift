@@ -6,6 +6,8 @@ struct WebScreen: View {
 
     @StateObject private var model: WebModel
     @State private var showingPairing = false
+    @State private var showingTools = false
+    @State private var draft = ""
 
     init(url: URL) {
         _model = StateObject(wrappedValue: WebModel(url: url))
@@ -51,6 +53,32 @@ struct WebScreen: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+
+            if model.isChat && !model.unreachable {
+                VStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    ComposerBar(
+                        draft: $draft,
+                        onPlus: { showingTools = true },
+                        onSend: {
+                            model.send(draft)
+                            draft = ""
+                        }
+                    )
+                    .padding(.horizontal, 12)
+                    .sheet(isPresented: $showingTools) {
+                        ToolSheet(
+                            modelName: model.modelName,
+                            modeName: model.modeName,
+                            onAttach: { closeTools(then: model.pickAttachment) },
+                            onPlugins: { closeTools(then: model.openAttachmentPanel) },
+                            onPermission: { closeTools(then: model.openModePopover) },
+                            onModel: { closeTools(then: model.openModelPopover) }
+                        )
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
         .animation(.easeInOut(duration: 0.18), value: model.isChat)
         .sheet(isPresented: $showingPairing) {
@@ -61,6 +89,15 @@ struct WebScreen: View {
             if phase == .active {
                 model.checkReachability()
             }
+        }
+    }
+
+    /// The web controls sit behind the sheet; dismiss it first, then press them,
+    /// otherwise the popover opens underneath.
+    private func closeTools(then action: @escaping () -> Void) {
+        showingTools = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            action()
         }
     }
 }
