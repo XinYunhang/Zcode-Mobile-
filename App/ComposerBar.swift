@@ -1,9 +1,11 @@
 import SwiftUI
 import UIKit
 
-/// The native composer. The page's own input lives inside the web view, which
-/// can only approximate the system material, so the visible bar is drawn here
-/// and the draft is handed to the page's editor on send.
+/// The native composer.
+///
+/// Shape follows the reference apps: a fixed 26pt corner that does not grow with
+/// the content, controls pinned to the bottom so they ride the corner, and a
+/// height that steps by exactly one line each time the draft wraps.
 struct ComposerBar: View {
     @Binding var draft: String
     let attachments: [WebModel.PendingAttachment]
@@ -12,6 +14,10 @@ struct ComposerBar: View {
 
     @FocusState private var focused: Bool
     @State private var previewing: WebModel.PendingAttachment?
+    @State private var fieldHeight: CGFloat = 0
+
+    private let corner: CGFloat = 26
+    private let button: CGFloat = 30
 
     var body: some View {
         VStack(spacing: 6) {
@@ -41,12 +47,12 @@ struct ComposerBar: View {
     }
 
     private var bar: some View {
-        HStack(alignment: .bottom, spacing: 8) {
+        HStack(alignment: .bottom, spacing: 10) {
             Button(action: onPlus) {
                 Image(systemName: "plus")
-                    .font(.system(size: 17, weight: .medium))
+                    .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(.white.opacity(0.85))
-                    .frame(width: 36, height: 36)
+                    .frame(width: button, height: button)
                     .contentShape(Circle())
             }
             .buttonStyle(.plain)
@@ -54,7 +60,7 @@ struct ComposerBar: View {
             .accessibilityLabel("附件")
 
             TextField("向 ZCode 发送任务…", text: $draft, axis: .vertical)
-                .lineLimit(1...5)
+                .lineLimit(1...6)
                 .textFieldStyle(.plain)
                 .font(.system(size: 15))
                 .foregroundStyle(.white)
@@ -62,14 +68,18 @@ struct ComposerBar: View {
                 .focused($focused)
                 .submitLabel(.send)
                 .onSubmit(submit)
-                .frame(minHeight: 36)
-                .padding(.vertical, 6)
+                .padding(.vertical, 5)
+                .background(
+                    GeometryReader { proxy in
+                        Color.clear.preference(key: FieldHeightKey.self, value: proxy.size.height)
+                    }
+                )
 
             Button(action: submit) {
                 Image(systemName: "arrow.up")
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(.white)
-                    .frame(width: 36, height: 36)
+                    .frame(width: button, height: button)
                     .background(sendTint, in: Circle())
                     .contentShape(Circle())
             }
@@ -77,9 +87,12 @@ struct ComposerBar: View {
             .disabled(!canSend)
             .accessibilityLabel("发送")
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 7)
-        .glassSurface(Capsule())
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .glassSurface(RoundedRectangle(cornerRadius: corner, style: .continuous))
+        .onPreferenceChange(FieldHeightKey.self) { fieldHeight = $0 }
+        // One step per wrapped line reads as growth rather than a jump.
+        .animation(.easeInOut(duration: 0.18), value: fieldHeight)
         .environment(\.colorScheme, .dark)
     }
 
@@ -125,6 +138,13 @@ struct ComposerBar: View {
     private func submit() {
         guard canSend else { return }
         onSend()
+    }
+}
+
+private struct FieldHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 
