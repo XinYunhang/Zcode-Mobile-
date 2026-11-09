@@ -134,42 +134,31 @@ final class WebModel: NSObject, ObservableObject {
 
     // MARK: - Driving the page
 
-    /// Clicks a control the page marks with `data-testid`. Returns false when the
-    /// hook is gone, which is the signal that the page evolved past this build.
-    @discardableResult
-    func tap(testID: String) async -> Bool {
-        let js = """
-        const el = document.querySelector('[data-testid="' + testID + '"]');
-        if (!el) return false;
-        el.click();
-        return true;
-        """
-        return await withCheckedContinuation { continuation in
-            webView.callAsyncJavaScript(
-                js,
-                arguments: ["testID": testID],
-                in: nil,
-                in: .page
-            ) { result in
-                switch result {
-                case .success(let value):
-                    if let number = value as? NSNumber {
-                        continuation.resume(returning: number.boolValue)
-                    } else {
-                        continuation.resume(returning: (value as? Bool) ?? false)
-                    }
-                case .failure:
-                    continuation.resume(returning: false)
-                }
-            }
-        }
+    /// Clicks a control the page marks with `data-testid`. Fire-and-forget: the
+    /// page owns the result, we only need the tap to happen.
+    func tap(testID: String) {
+        let id = Self.jsString(testID)
+        webView.evaluateJavaScript(
+            "(function(){var el=document.querySelector('[data-testid='+\(id)+']');if(el){el.click();}})();"
+        )
     }
 
     /// Leaves the conversation and returns to the task list.
-    func exitToTaskList() async {
-        let handled = await tap(testID: "side-pane-toggle")
-        if handled { return }
-        webView.evaluateJavaScript("history.back()")
+    func exitToTaskList() {
+        webView.evaluateJavaScript("""
+        (function(){
+          var el = document.querySelector('[data-testid=side-pane-toggle]');
+          if (el) { el.click(); return; }
+          history.back();
+        })();
+        """)
+    }
+
+    private static func jsString(_ value: String) -> String {
+        guard let data = try? JSONSerialization.data(withJSONObject: [value]),
+              let text = String(data: data, encoding: .utf8) else { return "\"\"" }
+        // JSONSerialization returns ["..."], drop the brackets.
+        return String(text.dropFirst().dropLast())
     }
 
     /// Called when the app returns to the foreground. A hung page cannot tell us

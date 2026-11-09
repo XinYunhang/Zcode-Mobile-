@@ -23,7 +23,7 @@ struct WebScreen: View {
             if model.isChat {
                 ShellTopBar(
                     online: !model.unreachable,
-                    onMenu: { Task { await model.exitToTaskList() } },
+                    onMenu: { model.exitToTaskList() },
                     onScan: { showingPairing = true },
                     onMore: { showingMore = true }
                 )
@@ -55,7 +55,7 @@ struct WebScreen: View {
                 .environmentObject(session)
         }
         .confirmationDialog("会话", isPresented: $showingMore, titleVisibility: .hidden) {
-            Button("退出任务会话") { Task { await model.exitToTaskList() } }
+            Button("退出任务会话") { model.exitToTaskList() }
             Button("重新加载") { model.reload() }
             Button("清除缓存并重载") { model.clearCacheAndReload() }
             Button("更换连接地址") { session.forget() }

@@ -48,6 +48,12 @@ jobs:
               tail -40 build.log
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
+            # Mirrored as check-run annotations so the failure is readable from
+            # the API without downloading logs.
+            grep -E "error:|fatal error:" build.log | head -15 | while IFS= read -r line; do
+              short=$(printf '%s' "$line" | cut -c1-380 | sed 's/%/%25/g')
+              echo "::error::${short}"
+            done
           fi
           exit $status
 
