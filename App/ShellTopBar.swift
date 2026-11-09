@@ -87,7 +87,7 @@ private extension View {
         } else {
             self
                 .background(.ultraThinMaterial, in: shape)
-                .overlay(shape.strokeBorder(.white.opacity(0.14), lineWidth: 0.5))
+                .overlay(shape.stroke(Color.white.opacity(0.14), lineWidth: 0.5))
         }
     }
 }
