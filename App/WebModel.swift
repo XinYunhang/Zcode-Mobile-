@@ -38,6 +38,13 @@ final class WebModel: NSObject, ObservableObject {
             )
         )
         configuration.userContentController.addUserScript(ShellTheme.injectionScript)
+        configuration.userContentController.addUserScript(
+            WKUserScript(
+                source: Self.composerToolsScript,
+                injectionTime: .atDocumentStart,
+                forMainFrameOnly: true
+            )
+        )
 
         webView = WKWebView(frame: .zero, configuration: configuration)
         super.init()
@@ -232,6 +239,414 @@ final class WebModel: NSObject, ObservableObject {
       return JSON.stringify(out);
     })();
     """
+
+    // MARK: - Composer tools
+
+    /// Two page-level affordances the remote UI does not expose on its own:
+    ///
+    /// * A "模型 · <name>" row at the top of the attachment popover, which
+    ///   closes the popover and then opens the real model picker.
+    /// * A 500 ms long press on send that opens the model picker instead of
+    ///   sending the message.
+    ///
+    /// The model picker opens from a real pointer sequence: its Radix trigger
+    /// ignores `el.click()` entirely. The plus panel is rebuilt by React on
+    /// every open, so a MutationObserver re-inserts our row each time instead
+    /// of relying on the node surviving.
+    private static let composerToolsScript = #"""
+    (function () {
+      'use strict';
+
+      if (window.__zcsComposerTools) { return; }
+      window.__zcsComposerTools = true;
+
+      var PANEL = '[data-testid="prompt-suggestion-panel"]';
+      var MODEL_TRIGGER = '[data-testid="chat-model-select-trigger"]';
+      var SEND = '[data-testid="v4-composer-send"]';
+      var ROW_ATTR = 'data-zcs-model-row';
+      var ROW_LABEL_ATTR = 'data-zcs-model-label';
+      var HOLD_MS = 500;
+      var HOLD_SLOP = 10;
+      var CLOSE_DELAY_MS = 120;
+
+      function find(root, selector) {
+        return root && root.querySelector ? root.querySelector(selector) : null;
+      }
+
+      function closestElement(node, selector) {
+        if (!node || node.nodeType !== 1) { return null; }
+        return node.closest ? node.closest(selector) : null;
+      }
+
+      function currentModelName() {
+        var trigger = find(document, MODEL_TRIGGER);
+        if (!trigger) { return ''; }
+        var raw = trigger.innerText || trigger.textContent || '';
+        return raw.replace(/\s+/g, ' ').trim();
+      }
+
+      function rowLabel(name) {
+        return '模型 · ' + (name || '选择模型');
+      }
+
+      /// True only while dispatching our own model-picker tap. Those events
+      /// bubble through document too, and must not be mistaken for the end of
+      /// a real long press on send.
+      var syntheticTap = false;
+
+      /// Radix's trigger opens on pointerdown; a bare click() is ignored. Send
+      /// the whole sequence at the element's centre, with the payload mobile
+      /// WebKit would produce for a touch.
+      function tapLikeTouch(el) {
+        if (!el) { return; }
+        var rect = el.getBoundingClientRect();
+        var x = rect.left + rect.width / 2;
+        var y = rect.top + rect.height / 2;
+        var Ctor = window.PointerEvent || window.MouseEvent;
+
+        function init(buttons, detail) {
+          return {
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+            view: window,
+            detail: detail,
+            clientX: x,
+            clientY: y,
+            screenX: x,
+            screenY: y,
+            pointerId: 1,
+            pointerType: 'touch',
+            isPrimary: true,
+            button: 0,
+            buttons: buttons
+          };
+        }
+
+        syntheticTap = true;
+        try {
+          el.dispatchEvent(new Ctor('pointerdown', init(1, 0)));
+          el.dispatchEvent(new Ctor('pointerup', init(0, 0)));
+          el.dispatchEvent(new Ctor('click', init(0, 1)));
+        } catch (e) {
+          // The trigger may have been replaced mid-sequence; nothing to undo.
+        } finally {
+          syntheticTap = false;
+        }
+      }
+
+      // The attachment panel and the model popover are siblings in the same
+      // popper layer, so the first one has to be dismissed before the second
+      // can anchor itself. Escape is what Radix listens for.
+      var openingModel = false;
+      function dismissPanelAndOpenModel() {
+        if (openingModel) { return; }
+        openingModel = true;
+
+        var panel = find(document, PANEL);
+        var target = document.activeElement;
+        if (!target || !target.isConnected) {
+          target = panel || document.body || document;
+        }
+
+        var keyInit = {
+          key: 'Escape',
+          code: 'Escape',
+          keyCode: 27,
+          which: 27,
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        };
+        try {
+          target.dispatchEvent(new KeyboardEvent('keydown', keyInit));
+          target.dispatchEvent(new KeyboardEvent('keyup', keyInit));
+        } catch (e) {
+          try { document.dispatchEvent(new KeyboardEvent('keydown', keyInit)); } catch (e2) {}
+        }
+
+        window.setTimeout(function () {
+          openingModel = false;
+          tapLikeTouch(find(document, MODEL_TRIGGER));
+        }, CLOSE_DELAY_MS);
+      }
+
+      function styleRow(row, sample) {
+        var s = row.style;
+        s.display = 'flex';
+        s.alignItems = 'center';
+        s.boxSizing = 'border-box';
+        s.width = '100%';
+        s.minHeight = '40px';
+        s.margin = '0';
+        s.padding = '10px 12px';
+        s.border = '0';
+        s.borderRadius = '10px';
+        s.background = 'transparent';
+        s.color = 'inherit';
+        s.fontFamily = 'inherit';
+        s.fontSize = '14px';
+        s.fontWeight = '400';
+        s.lineHeight = '20px';
+        s.textAlign = 'left';
+        s.cursor = 'pointer';
+        s.outline = 'none';
+        s.webkitTapHighlightColor = 'transparent';
+        s.transition = 'background-color 120ms ease';
+
+        if (!sample) { return; }
+        try {
+          var cs = window.getComputedStyle(sample);
+          if (!cs) { return; }
+          if (cs.fontFamily) { s.fontFamily = cs.fontFamily; }
+          if (cs.fontSize) { s.fontSize = cs.fontSize; }
+          if (cs.fontWeight) { s.fontWeight = cs.fontWeight; }
+          if (cs.lineHeight && cs.lineHeight !== 'normal') { s.lineHeight = cs.lineHeight; }
+          if (cs.letterSpacing && cs.letterSpacing !== 'normal') { s.letterSpacing = cs.letterSpacing; }
+          if (cs.color) { s.color = cs.color; }
+          if (cs.borderRadius && cs.borderRadius !== '0px') { s.borderRadius = cs.borderRadius; }
+          var padding = [cs.paddingTop, cs.paddingRight, cs.paddingBottom, cs.paddingLeft];
+          if (padding.every(function (value) {
+            var number = parseFloat(value);
+            return isFinite(number) && number >= 0;
+          })) {
+            s.padding = padding.join(' ');
+          }
+          var height = sample.getBoundingClientRect().height;
+          if (height > 0) { s.minHeight = Math.round(height) + 'px'; }
+        } catch (e) {}
+      }
+
+      function bindPressFeedback(row) {
+        function clear() { row.style.backgroundColor = 'transparent'; }
+        row.addEventListener('pointerdown', function () {
+          row.style.backgroundColor = 'rgba(127,127,127,0.16)';
+        }, true);
+        row.addEventListener('pointerup', clear, true);
+        row.addEventListener('pointercancel', clear, true);
+        row.addEventListener('pointerleave', clear, true);
+      }
+
+      function buildRow(name) {
+        var row = document.createElement('button');
+        row.type = 'button';
+        row.setAttribute(ROW_ATTR, '');
+        row.setAttribute(ROW_LABEL_ATTR, rowLabel(name));
+        row.setAttribute('aria-label', rowLabel(name));
+
+        var prefix = document.createElement('span');
+        prefix.textContent = '模型 · ';
+        prefix.style.opacity = '0.58';
+        prefix.style.flex = '0 0 auto';
+
+        var value = document.createElement('span');
+        value.textContent = name || '选择模型';
+        value.style.minWidth = '0';
+        value.style.overflow = 'hidden';
+        value.style.textOverflow = 'ellipsis';
+        value.style.whiteSpace = 'nowrap';
+
+        row.appendChild(prefix);
+        row.appendChild(value);
+        row.__zcsValue = value;
+
+        // Capture so the panel's own click handling cannot run first and close
+        // the panel before our Escape + delayed trigger sequence.
+        row.addEventListener('click', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          dismissPanelAndOpenModel();
+        }, true);
+
+        bindPressFeedback(row);
+        return row;
+      }
+
+      /// The first real row in the panel is both the insertion anchor and the
+      /// style sample. If the panel is still empty, fall back to the panel.
+      function firstRow(panel) {
+        var groups = [
+          '[role="menuitem"]',
+          '[role="option"]',
+          '[role="button"]',
+          'button',
+          'a[href]',
+          'li'
+        ];
+        for (var g = 0; g < groups.length; g++) {
+          var list = panel.querySelectorAll(groups[g]);
+          for (var i = 0; i < list.length; i++) {
+            var el = list[i];
+            if (el.hasAttribute(ROW_ATTR)) { continue; }
+            if (el.closest('[' + ROW_ATTR + ']')) { continue; }
+            return el;
+          }
+        }
+        return null;
+      }
+
+      function ensureRow() {
+        var panel = find(document, PANEL);
+        if (!panel) { return; }
+
+        var name = currentModelName();
+        var label = rowLabel(name);
+        var anchor = firstRow(panel);
+        var parent = anchor && anchor.parentNode ? anchor.parentNode : panel;
+        var row = panel.querySelector('[' + ROW_ATTR + ']');
+
+        if (!row) {
+          row = buildRow(name);
+          styleRow(row, anchor);
+          parent.insertBefore(row, anchor || parent.firstChild);
+          return;
+        }
+
+        // React may have replaced the panel's contents but kept our node in a
+        // detached or stale position. Put it back above the first row.
+        if (row.parentNode !== parent) {
+          styleRow(row, anchor);
+          parent.insertBefore(row, anchor || parent.firstChild);
+        } else if (anchor && row.nextElementSibling !== anchor) {
+          parent.insertBefore(row, anchor);
+        }
+
+        if (row.getAttribute(ROW_LABEL_ATTR) !== label) {
+          row.setAttribute(ROW_LABEL_ATTR, label);
+          row.setAttribute('aria-label', label);
+          if (row.__zcsValue) { row.__zcsValue.textContent = name || '选择模型'; }
+        }
+      }
+
+      var ensureScheduled = false;
+      function scheduleEnsure() {
+        if (ensureScheduled) { return; }
+        ensureScheduled = true;
+        // A timeout rather than requestAnimationFrame: the row only needs the
+        // DOM, and rAF is paused while the web view is in the background.
+        window.setTimeout(function () {
+          ensureScheduled = false;
+          try { ensureRow(); } catch (e) {}
+        }, 0);
+      }
+
+      function watchPanel() {
+        if (!window.MutationObserver) { return; }
+        var observer = new MutationObserver(function () {
+          // Fast path: no panel, nothing to do. The panel is mounted on open
+          // and destroyed on close, so a single query per mutation batch is
+          // enough and keeps streaming transcripts cheap.
+          if (!find(document, PANEL)) { return; }
+          scheduleEnsure();
+        });
+        observer.observe(document.documentElement, { childList: true, subtree: true });
+      }
+
+      // Long press on send. Listeners live at capture time on document because
+      // the composer's button is re-rendered by React.
+      var press = null;
+      var suppressSendClick = false;
+      var suppressReset = 0;
+
+      function endPress() {
+        if (press && press.timer) {
+          window.clearTimeout(press.timer);
+        }
+        press = null;
+      }
+
+      // After a long press has fired, keep swallowing until the touch ends and
+      // its click arrives (or 800 ms pass without one). A fixed timer from the
+      // 500 ms mark would let an unusually long hold send on release.
+      function scheduleSuppressReset() {
+        if (!suppressSendClick) { return; }
+        window.clearTimeout(suppressReset);
+        suppressReset = window.setTimeout(function () {
+          suppressSendClick = false;
+        }, 800);
+      }
+
+      function onPressDown(event) {
+        if (syntheticTap) { return; }
+        if (event.isPrimary === false) { return; }
+        if (event.pointerType === 'mouse' && event.button !== 0) { return; }
+        if (!closestElement(event.target, SEND)) { return; }
+
+        endPress();
+        // A new press always starts unsuppressed, so a stale flag from a long
+        // press whose click never arrived cannot eat a real send tap.
+        suppressSendClick = false;
+        window.clearTimeout(suppressReset);
+
+        var pointerId = event.pointerId == null ? 1 : event.pointerId;
+        press = {
+          id: pointerId,
+          x: event.clientX,
+          y: event.clientY,
+          timer: 0
+        };
+        press.timer = window.setTimeout(function () {
+          if (!press) { return; }
+          press.timer = 0;
+          suppressSendClick = true;
+          tapLikeTouch(find(document, MODEL_TRIGGER));
+        }, HOLD_MS);
+      }
+
+      function onPressMove(event) {
+        if (syntheticTap || !press) { return; }
+        var pointerId = event.pointerId == null ? 1 : event.pointerId;
+        if (pointerId !== press.id) { return; }
+        var dx = event.clientX - press.x;
+        var dy = event.clientY - press.y;
+        if (dx * dx + dy * dy > HOLD_SLOP * HOLD_SLOP) {
+          endPress();
+          scheduleSuppressReset();
+        }
+      }
+
+      function onPressUp(event) {
+        if (syntheticTap || !press) { return; }
+        var pointerId = event.pointerId == null ? 1 : event.pointerId;
+        if (pointerId !== press.id) { return; }
+        endPress();
+        scheduleSuppressReset();
+      }
+
+      function onClickCapture(event) {
+        if (!suppressSendClick) { return; }
+        if (!closestElement(event.target, SEND)) { return; }
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.stopImmediatePropagation) { event.stopImmediatePropagation(); }
+        suppressSendClick = false;
+        window.clearTimeout(suppressReset);
+      }
+
+      function boot() {
+        if (!document.documentElement) {
+          window.setTimeout(boot, 16);
+          return;
+        }
+
+        document.addEventListener('pointerdown', onPressDown, true);
+        document.addEventListener('pointermove', onPressMove, true);
+        document.addEventListener('pointerup', onPressUp, true);
+        document.addEventListener('pointercancel', onPressUp, true);
+        document.addEventListener('click', onClickCapture, true);
+        window.addEventListener('blur', endPress, true);
+
+        watchPanel();
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', scheduleEnsure, { once: true });
+        } else {
+          scheduleEnsure();
+        }
+      }
+
+      boot();
+    })();
+    """#
 
     private static var languageOverrideScript: String {
         let preferred = Locale.preferredLanguages
