@@ -491,24 +491,21 @@ final class WebModel: NSObject, ObservableObject {
 
         var name = currentModelName();
         var label = rowLabel(name);
-        var anchor = firstRow(panel);
-        var parent = anchor && anchor.parentNode ? anchor.parentNode : panel;
         var row = panel.querySelector('[' + ROW_ATTR + ']');
 
+        // Insert as a direct child of the panel, not beside the first row.
+        // Sibling insertion landed inside one of the panel's internal groups
+        // and squashed the rows below it onto a single line.
         if (!row) {
           row = buildRow(name);
-          styleRow(row, anchor);
-          parent.insertBefore(row, anchor || parent.firstChild);
+          styleRow(row, null);
+          panel.insertBefore(row, panel.firstChild);
           return;
         }
 
-        // React may have replaced the panel's contents but kept our node in a
-        // detached or stale position. Put it back above the first row.
-        if (row.parentNode !== parent) {
-          styleRow(row, anchor);
-          parent.insertBefore(row, anchor || parent.firstChild);
-        } else if (anchor && row.nextElementSibling !== anchor) {
-          parent.insertBefore(row, anchor);
+        if (row.parentNode !== panel || panel.firstElementChild !== row) {
+          styleRow(row, null);
+          panel.insertBefore(row, panel.firstChild);
         }
 
         if (row.getAttribute(ROW_LABEL_ATTR) !== label) {
