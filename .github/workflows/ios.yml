@@ -15,6 +15,9 @@ jobs:
         run: |
           xcodebuild -version
           xcrun --sdk iphoneos --show-sdk-version
+          # Surfaced as a check-run annotation so the SDK version is readable
+          # without downloading logs.
+          echo "::notice::Xcode $(xcodebuild -version | head -1) / iOS SDK $(xcrun --sdk iphoneos --show-sdk-version)"
 
       - name: Install XcodeGen
         run: brew install xcodegen

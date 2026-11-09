@@ -19,7 +19,8 @@ struct ShellTopBar: View {
             trailingPill
         }
         // The page is dark regardless of the system appearance, so the chrome
-        // must render dark too: otherwise material goes light and icons go black.
+        // must render dark too: otherwise the material goes light and the icons
+        // would need to be black.
         .environment(\.colorScheme, .dark)
     }
 
@@ -32,8 +33,7 @@ struct ShellTopBar: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .background(.ultraThinMaterial, in: Circle())
-        .overlay(Circle().strokeBorder(.white.opacity(0.14), lineWidth: 0.5))
+        .glassSurface(Circle())
         .overlay(alignment: .topTrailing) {
             Circle()
                 .fill(online ? Color(red: 0.18, green: 0.75, blue: 0.45)
@@ -72,7 +72,22 @@ struct ShellTopBar: View {
             }
             .accessibilityLabel("更多")
         }
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(.white.opacity(0.14), lineWidth: 0.5))
+        .glassSurface(Capsule())
+    }
+}
+
+private extension View {
+    /// iOS 26 renders the system Liquid Glass material; older systems fall back
+    /// to a blur. The glass branch also carries its own edge treatment, so no
+    /// manual border is added on top.
+    @ViewBuilder
+    func glassSurface<S: Shape>(_ shape: S) -> some View {
+        if #available(iOS 26.0, *) {
+            self.glassEffect(.regular, in: shape)
+        } else {
+            self
+                .background(.ultraThinMaterial, in: shape)
+                .overlay(shape.strokeBorder(.white.opacity(0.14), lineWidth: 0.5))
+        }
     }
 }

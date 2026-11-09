@@ -54,17 +54,16 @@ enum ShellTheme {
       color: #fff !important;
     }
 
-    /* 7. The model picker now lives in the attachment panel. Keep the trigger in
-          the DOM with a zero-width box: the popover anchors to its rect, so it
-          must not be display:none, but it should leave no gap in the row. */
+    /* 7. The model picker now lives in the attachment panel. The trigger has to
+          keep a real, non-zero box because the popover anchors to its rect; a
+          zero-width box produced no usable anchor and the panel never showed.
+          Absolute positioning takes it out of the row without leaving a gap. */
     html.zcs [data-testid="chat-model-select-trigger"] {
-      width: 0 !important;
-      min-width: 0 !important;
-      max-width: 0 !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      border: 0 !important;
-      overflow: hidden !important;
+      position: absolute !important;
+      right: 70px !important;
+      bottom: 12px !important;
+      width: 60px !important;
+      height: 28px !important;
       opacity: 0 !important;
       pointer-events: none !important;
     }
