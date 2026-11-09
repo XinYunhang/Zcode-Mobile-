@@ -54,18 +54,33 @@ enum ShellTheme {
       color: #fff !important;
     }
 
-    /* 7. The composer is drawn natively now. Fade the page's card out but keep
-          its box in the layout: the attachment panel and the model popover
-          anchor to controls inside it, so it must not be display:none. */
+    /* 7. Composer card: glassier surface instead of a flat block. The page keeps
+          owning this control — a native replacement broke the attachment panel
+          and the model popover, which anchor to controls inside it. */
     html.zcs [data-testid="v4-composer"] .rounded-2xl {
-      height: 64px !important;
-      min-height: 64px !important;
-      overflow: hidden !important;
-      opacity: 0 !important;
-      pointer-events: none !important;
-      background: transparent !important;
-      border: 0 !important;
-      box-shadow: none !important;
+      border-radius: 26px !important;
+      background: rgba(255,255,255,.055) !important;
+      border-color: rgba(255,255,255,.10) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 10px 26px rgba(0,0,0,.34) !important;
+    }
+
+    /* 8. Fade the transcript into the edges instead of cutting it off with a
+          hard border, the way the reference apps do. */
+    html.zcs [data-testid="v4-timeline"] {
+      -webkit-mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        #000 22px,
+        #000 calc(100% - 14px),
+        transparent 100%
+      );
+      mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        #000 22px,
+        #000 calc(100% - 14px),
+        transparent 100%
+      );
     }
     """
 

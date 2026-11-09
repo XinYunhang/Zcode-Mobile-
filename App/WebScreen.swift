@@ -6,7 +6,6 @@ struct WebScreen: View {
 
     @StateObject private var model: WebModel
     @State private var showingPairing = false
-    @State private var draft = ""
 
     init(url: URL) {
         _model = StateObject(wrappedValue: WebModel(url: url))
@@ -50,22 +49,6 @@ struct WebScreen: View {
                     onRetry: { model.checkReachability() },
                     onReload: { model.reload() }
                 )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-
-            if model.isChat && !model.unreachable {
-                VStack(spacing: 0) {
-                    Spacer(minLength: 0)
-                    ComposerBar(
-                        draft: $draft,
-                        onPlus: { model.openAttachmentPanel() },
-                        onSend: {
-                            model.send(draft)
-                            draft = ""
-                        }
-                    )
-                    .padding(.horizontal, 12)
-                }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }

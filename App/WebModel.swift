@@ -5,8 +5,9 @@ final class WebModel: NSObject, ObservableObject {
     @Published var unreachable = false
     @Published var loading = true
     /// True while a conversation is open, so the native bar only covers the
-    /// strips it was designed for.
-    @Published var isChat = true
+    /// strips it was designed for. Starts false: the app opens on the task list,
+    /// and showing the bar before the first check made it flash on launch.
+    @Published var isChat = false
 
     let webView: WKWebView
 
@@ -751,6 +752,9 @@ extension WebModel: WKNavigationDelegate {
         loading = false
         unreachable = false
         restoreScroll()
+        // Route is known as soon as the document settles; don't wait for the
+        // polling timer, which is what made the bar flash in late.
+        pollRoute()
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
