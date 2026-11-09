@@ -11,6 +11,7 @@ struct ComposerBar: View {
     let onSend: () -> Void
 
     @FocusState private var focused: Bool
+    @State private var previewing: WebModel.PendingAttachment?
 
     var body: some View {
         VStack(spacing: 6) {
@@ -18,7 +19,13 @@ struct ComposerBar: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(attachments) { item in
-                            thumbnail(item)
+                            Button {
+                                focused = false
+                                previewing = item
+                            } label: {
+                                thumbnail(item)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                     .padding(.horizontal, 6)
@@ -28,6 +35,9 @@ struct ComposerBar: View {
 
             bar
         }
+        .sheet(item: $previewing) { item in
+            AttachmentPreview(item: item)
+        }
     }
 
     private var bar: some View {
@@ -36,7 +46,7 @@ struct ComposerBar: View {
                 Image(systemName: "plus")
                     .font(.system(size: 17, weight: .medium))
                     .foregroundStyle(.white.opacity(0.85))
-                    .frame(width: 38, height: 38)
+                    .frame(width: 36, height: 36)
                     .contentShape(Circle())
             }
             .buttonStyle(.plain)
@@ -44,7 +54,7 @@ struct ComposerBar: View {
             .accessibilityLabel("附件")
 
             TextField("向 ZCode 发送任务…", text: $draft, axis: .vertical)
-                .lineLimit(1...4)
+                .lineLimit(1...5)
                 .textFieldStyle(.plain)
                 .font(.system(size: 15))
                 .foregroundStyle(.white)
@@ -52,13 +62,14 @@ struct ComposerBar: View {
                 .focused($focused)
                 .submitLabel(.send)
                 .onSubmit(submit)
-                .padding(.vertical, 9)
+                .frame(minHeight: 36)
+                .padding(.vertical, 6)
 
             Button(action: submit) {
                 Image(systemName: "arrow.up")
-                    .font(.system(size: 17, weight: .bold))
+                    .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(.white)
-                    .frame(width: 38, height: 38)
+                    .frame(width: 36, height: 36)
                     .background(sendTint, in: Circle())
                     .contentShape(Circle())
             }
@@ -114,5 +125,55 @@ struct ComposerBar: View {
     private func submit() {
         guard canSend else { return }
         onSend()
+    }
+}
+
+/// Full-screen look at one picked file. Images fill the screen; everything else
+/// falls back to a file card.
+private struct AttachmentPreview: View {
+    let item: WebModel.PendingAttachment
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            if let image = item.image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .ignoresSafeArea()
+            } else {
+                VStack(spacing: 14) {
+                    Image(systemName: "doc.fill")
+                        .font(.system(size: 48))
+                        .foregroundStyle(.white.opacity(0.7))
+                    Text(item.name)
+                        .font(.system(size: 15))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                }
+            }
+
+            VStack {
+                HStack {
+                    Spacer()
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 34, height: 34)
+                            .background(.white.opacity(0.16), in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(16)
+                }
+                Spacer()
+            }
+        }
+        .environment(\.colorScheme, .dark)
     }
 }

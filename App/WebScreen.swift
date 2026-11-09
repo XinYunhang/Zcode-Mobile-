@@ -1,3 +1,4 @@
+import UIKit
 import SwiftUI
 
 struct WebScreen: View {
@@ -61,7 +62,17 @@ struct WebScreen: View {
                 ComposerBar(
                     draft: $draft,
                     attachments: model.attachments,
-                    onPlus: { showingTools = true },
+                    onPlus: {
+                        // Drop the keyboard first, otherwise the sheet and the
+                        // keyboard try to occupy the same space.
+                        UIApplication.shared.sendAction(
+                            #selector(UIResponder.resignFirstResponder),
+                            to: nil, from: nil, for: nil
+                        )
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                            showingTools = true
+                        }
+                    },
                     onSend: {
                         model.send(draft)
                         draft = ""
