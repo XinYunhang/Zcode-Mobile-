@@ -34,6 +34,25 @@ enum ShellTheme {
       border-color: rgba(255,255,255,.10) !important;
       box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 10px 26px rgba(0,0,0,.34) !important;
     }
+
+    /* 5. The progress panel overhangs the top of the transcript and ignores the
+          timeline's padding, so offset it directly. */
+    html.zcs [data-testid="chat-summary-panel"] {
+      margin-top: 52px !important;
+    }
+
+    /* 6. User messages become a filled accent bubble; assistant messages are
+          already plain text and stay that way. */
+    html.zcs .group\\/user-row > div.rounded-xl {
+      background: linear-gradient(180deg, #3b86f8, #2a6ee6) !important;
+      border-color: transparent !important;
+      border-radius: 19px 19px 6px 19px !important;
+      box-shadow: 0 4px 14px rgba(47,123,246,.22) !important;
+    }
+    html.zcs .group\\/user-row > div.rounded-xl,
+    html.zcs .group\\/user-row > div.rounded-xl * {
+      color: #fff !important;
+    }
     """
 
     /// Installs the stylesheet as soon as the document has a head. The rules are
