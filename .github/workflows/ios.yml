@@ -26,6 +26,7 @@ jobs:
       # certificate, so no Apple credentials live in this repository.
       - name: Build
         run: |
+          set +e
           xcodebuild \
             -project ZCodeShell.xcodeproj \
             -scheme ZCodeShell \
@@ -36,7 +37,19 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            build
+            build > build.log 2>&1
+          status=$?
+          if [ $status -ne 0 ]; then
+            {
+              echo "### Build failed (exit $status)"
+              echo '```'
+              grep -nE "error:|fatal error:" build.log | head -40
+              echo '--- tail ---'
+              tail -40 build.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit $status
 
       - name: Package unsigned IPA
         run: |

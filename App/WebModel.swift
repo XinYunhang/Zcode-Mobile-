@@ -144,19 +144,31 @@ final class WebModel: NSObject, ObservableObject {
         el.click();
         return true;
         """
-        let result = try? await webView.callAsyncJavaScript(
-            js,
-            arguments: ["testID": testID],
-            in: nil,
-            in: .page
-        )
-        if let number = result as? NSNumber { return number.boolValue }
-        return (result as? Bool) ?? false
+        return await withCheckedContinuation { continuation in
+            webView.callAsyncJavaScript(
+                js,
+                arguments: ["testID": testID],
+                in: nil,
+                in: .page
+            ) { result in
+                switch result {
+                case .success(let value):
+                    if let number = value as? NSNumber {
+                        continuation.resume(returning: number.boolValue)
+                    } else {
+                        continuation.resume(returning: (value as? Bool) ?? false)
+                    }
+                case .failure:
+                    continuation.resume(returning: false)
+                }
+            }
+        }
     }
 
     /// Leaves the conversation and returns to the task list.
     func exitToTaskList() async {
-        if await tap(testID: "side-pane-toggle") { return }
+        let handled = await tap(testID: "side-pane-toggle")
+        if handled { return }
         webView.evaluateJavaScript("history.back()")
     }
 
