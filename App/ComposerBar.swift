@@ -10,6 +10,7 @@ import UIKit
 struct ComposerBar: View {
     @Binding var draft: String
     let attachments: [WebModel.PendingAttachment]
+    let onRemove: (Int) -> Void
     let onPlus: () -> Void
     let onSend: () -> Void
 
@@ -29,19 +30,34 @@ struct ComposerBar: View {
             if !attachments.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(attachments) { item in
-                            Button {
-                                focused = false
-                                previewing = item
-                            } label: {
-                                thumbnail(item)
+                        ForEach(Array(attachments.enumerated()), id: \.element.id) { index, item in
+                            ZStack(alignment: .topTrailing) {
+                                Button {
+                                    focused = false
+                                    previewing = item
+                                } label: {
+                                    thumbnail(item)
+                                }
+                                .buttonStyle(.plain)
+
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    onRemove(index)
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.system(size: 16))
+                                        .foregroundStyle(.white, .black.opacity(0.6))
+                                }
+                                .buttonStyle(.plain)
+                                .offset(x: 5, y: -5)
+                                .accessibilityLabel("移除附件")
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                     .padding(.horizontal, 6)
+                    .padding(.top, 6)
                 }
-                .frame(height: 56)
+                .frame(height: 62)
             }
 
             bar

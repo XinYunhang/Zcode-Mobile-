@@ -62,6 +62,12 @@ struct WebScreen: View {
                 ComposerBar(
                     draft: $draft,
                     attachments: model.attachments,
+                    onRemove: { index in
+                        model.removeAttachment(at: index)
+                        if model.attachments.indices.contains(index) {
+                            model.attachments.remove(at: index)
+                        }
+                    },
                     onPlus: {
                         // Drop the keyboard first, otherwise the sheet and the
                         // keyboard try to occupy the same space.

@@ -237,6 +237,21 @@ final class WebModel: NSObject, ObservableObject {
         """)
     }
 
+    /// Removes one pending attachment from the page's composer. The control has
+    /// no testid, but it lives inside the attachment container and carries a
+    /// stable "移除附件" label.
+    func removeAttachment(at index: Int) {
+        webView.evaluateJavaScript("""
+        (function(index){
+          var list = document.querySelectorAll('[data-testid^="v4-attachment-"]');
+          var item = list[index];
+          if (!item) { return; }
+          var button = item.querySelector('button[aria-label*="移除"]');
+          if (button) { button.click(); }
+        })(\(index));
+        """)
+    }
+
     /// Opens the page's attachment panel — used for the plugin list, which stays
     /// a web surface in this build.
     func openAttachmentPanel() {
