@@ -3,9 +3,10 @@ import UIKit
 
 /// The native composer.
 ///
-/// Shape follows the reference apps: a fixed 26pt corner that does not grow with
-/// the content, controls pinned to the bottom so they ride the corner, and a
-/// height that steps by exactly one line each time the draft wraps.
+/// Cards follow the reference apps: a fixed 26pt corner that does not grow with
+/// the content, controls pinned to the bottom, and a height that steps by one
+/// line each time the draft wraps. Once the draft wraps, the text moves above
+/// the control row instead of sitting beside the plus button.
 struct ComposerBar: View {
     @Binding var draft: String
     let attachments: [WebModel.PendingAttachment]
@@ -18,6 +19,10 @@ struct ComposerBar: View {
 
     private let corner: CGFloat = 26
     private let button: CGFloat = 30
+    /// Height of the text field on a single line, padding included.
+    private let singleLineHeight: CGFloat = 34
+
+    private var isMultiline: Bool { fieldHeight > singleLineHeight }
 
     var body: some View {
         VStack(spacing: 6) {
@@ -47,18 +52,7 @@ struct ComposerBar: View {
     }
 
     private var bar: some View {
-        HStack(alignment: .bottom, spacing: 10) {
-            Button(action: onPlus) {
-                Image(systemName: "plus")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.85))
-                    .frame(width: button, height: button)
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .background(.white.opacity(0.08), in: Circle())
-            .accessibilityLabel("附件")
-
+        ZStack(alignment: .bottom) {
             TextField("向 ZCode 发送任务…", text: $draft, axis: .vertical)
                 .lineLimit(1...6)
                 .textFieldStyle(.plain)
@@ -69,29 +63,50 @@ struct ComposerBar: View {
                 .submitLabel(.send)
                 .onSubmit(submit)
                 .padding(.vertical, 5)
+                .padding(.leading, isMultiline ? 2 : button + 10)
+                .padding(.trailing, isMultiline ? 2 : button + 10)
+                .padding(.bottom, isMultiline ? button + 6 : 0)
                 .background(
                     GeometryReader { proxy in
                         Color.clear.preference(key: FieldHeightKey.self, value: proxy.size.height)
                     }
                 )
 
-            Button(action: submit) {
-                Image(systemName: "arrow.up")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: button, height: button)
-                    .background(sendTint, in: Circle())
-                    .contentShape(Circle())
+            HStack(spacing: 0) {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    onPlus()
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .frame(width: button, height: button)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .background(.white.opacity(0.08), in: Circle())
+                .accessibilityLabel("附件")
+
+                Spacer(minLength: 0)
+
+                Button(action: submit) {
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: button, height: button)
+                        .background(sendTint, in: Circle())
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .disabled(!canSend)
+                .accessibilityLabel("发送")
             }
-            .buttonStyle(.plain)
-            .disabled(!canSend)
-            .accessibilityLabel("发送")
+            .frame(height: button)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .glassSurface(RoundedRectangle(cornerRadius: corner, style: .continuous))
         .onPreferenceChange(FieldHeightKey.self) { fieldHeight = $0 }
-        // One step per wrapped line reads as growth rather than a jump.
         .animation(.easeInOut(duration: 0.18), value: fieldHeight)
         .environment(\.colorScheme, .dark)
     }
@@ -137,6 +152,7 @@ struct ComposerBar: View {
 
     private func submit() {
         guard canSend else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         onSend()
     }
 }
