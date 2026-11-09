@@ -1,3 +1,4 @@
+import UIKit
 import SwiftUI
 import WebKit
 
@@ -11,6 +12,17 @@ final class WebModel: NSObject, ObservableObject {
     /// Mirrors of the page's current selections, shown in the native tool sheet.
     @Published var modelName = ""
     @Published var modeName = ""
+    /// Files handed to the page's file input. The page renders its own preview
+    /// inside the composer, which the native bar covers, so the strip is drawn
+    /// here from what the picker actually returned.
+    @Published var attachments: [PendingAttachment] = []
+
+    struct PendingAttachment: Identifiable {
+        let id = UUID()
+        let url: URL
+        let image: UIImage?
+        var name: String { url.lastPathComponent }
+    }
 
     let webView: WKWebView
 
@@ -248,23 +260,25 @@ final class WebModel: NSObject, ObservableObject {
     /// Writes the draft into the page's rich-text editor and presses send.
     /// `execCommand('insertText')` is what the editor actually listens for;
     /// assigning textContent or dispatching input events does not update it.
+    /// An empty draft still presses send, so attachments alone can be sent.
     func send(_ draft: String) {
         let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
         let payload = Self.jsString(trimmed)
 
         webView.evaluateJavaScript("""
         (function(){
+          var text = \(payload);
           var input = document.querySelector('[data-testid="v4-composer-input"]');
-          if (!input) { return; }
-          input.focus();
-          var sel = window.getSelection();
-          var range = document.createRange();
-          range.selectNodeContents(input);
-          sel.removeAllRanges();
-          sel.addRange(range);
-          document.execCommand('delete', false);
-          document.execCommand('insertText', false, \(payload));
+          if (input && text.length) {
+            input.focus();
+            var sel = window.getSelection();
+            var range = document.createRange();
+            range.selectNodeContents(input);
+            sel.removeAllRanges();
+            sel.addRange(range);
+            document.execCommand('delete', false);
+            document.execCommand('insertText', false, text);
+          }
 
           window.setTimeout(function(){
             var btn = document.querySelector('[data-testid="v4-composer-send"]');
@@ -282,7 +296,7 @@ final class WebModel: NSObject, ObservableObject {
             btn.dispatchEvent(new Ctor('pointerdown', init(1, 0)));
             btn.dispatchEvent(new Ctor('pointerup', init(0, 0)));
             btn.dispatchEvent(new Ctor('click', init(0, 1)));
-          }, 180);
+          }, text.length ? 180 : 60);
         })();
         """)
     }
@@ -849,7 +863,17 @@ extension WebModel: WKUIDelegate {
         FilePicker.present(
             from: presenter,
             allowsMultiple: parameters.allowsMultipleSelection,
-            completion: completionHandler
+            completion: { [weak self] urls in
+                if let urls, !urls.isEmpty {
+                    let picked = urls.map { url in
+                        PendingAttachment(url: url, image: UIImage(contentsOfFile: url.path))
+                    }
+                    DispatchQueue.main.async {
+                        self?.attachments.append(contentsOf: picked)
+                    }
+                }
+                completionHandler(urls)
+            }
         )
     }
 }

@@ -1,16 +1,36 @@
 import SwiftUI
+import UIKit
 
 /// The native composer. The page's own input lives inside the web view, which
 /// can only approximate the system material, so the visible bar is drawn here
 /// and the draft is handed to the page's editor on send.
 struct ComposerBar: View {
     @Binding var draft: String
+    let attachments: [WebModel.PendingAttachment]
     let onPlus: () -> Void
     let onSend: () -> Void
 
     @FocusState private var focused: Bool
 
     var body: some View {
+        VStack(spacing: 6) {
+            if !attachments.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(attachments) { item in
+                            thumbnail(item)
+                        }
+                    }
+                    .padding(.horizontal, 6)
+                }
+                .frame(height: 56)
+            }
+
+            bar
+        }
+    }
+
+    private var bar: some View {
         HStack(alignment: .bottom, spacing: 8) {
             Button(action: onPlus) {
                 Image(systemName: "plus")
@@ -52,8 +72,39 @@ struct ComposerBar: View {
         .environment(\.colorScheme, .dark)
     }
 
+    private func thumbnail(_ item: WebModel.PendingAttachment) -> some View {
+        Group {
+            if let image = item.image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                ZStack {
+                    Color.white.opacity(0.10)
+                    VStack(spacing: 3) {
+                        Image(systemName: "doc.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.white.opacity(0.75))
+                        Text(item.name)
+                            .font(.system(size: 8))
+                            .foregroundStyle(.white.opacity(0.55))
+                            .lineLimit(1)
+                            .padding(.horizontal, 3)
+                    }
+                }
+            }
+        }
+        .frame(width: 56, height: 56)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(.white.opacity(0.14), lineWidth: 0.5)
+        )
+    }
+
     private var canSend: Bool {
         !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !attachments.isEmpty
     }
 
     private var sendTint: Color {

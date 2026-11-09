@@ -60,10 +60,12 @@ struct WebScreen: View {
             if model.isChat && !model.unreachable {
                 ComposerBar(
                     draft: $draft,
+                    attachments: model.attachments,
                     onPlus: { showingTools = true },
                     onSend: {
                         model.send(draft)
                         draft = ""
+                        model.attachments.removeAll()
                     }
                 )
                 .padding(.horizontal, 12)
